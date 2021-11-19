@@ -25,16 +25,65 @@ steam.charts$name <- tolower(gsub("[^[:alnum:] ]", "", steam.charts$name))
 
 #https://stackoverflow.com/questions/35113553/r-remove-first-character-from-string/35113673
 #özel karakterleri çýkardým, boþluklarý çýkardým çünkü ilk genre sürekli boþluksuz gözüküyordu direk datanýn içinde, ve baþa boþluk eklemek daha zor
-
 steam.games$popu_tags = sub('^.|.$',"", steam.games$popu_tags)
 steam.games$popu_tags <- gsub("'", "", steam.games$popu_tags)
 steam.games$popu_tags <- gsub(" ", "", steam.games$popu_tags)
-steam.games$popu_tags <- as.list(strsplit(steam.games$popu_tags, ","))
+steam.games$popu_tags <- gsub("]$", "", steam.games$popu_tags)
+steam.games$popu_tags <- gsub("\\+$", "", steam.games$popu_tags)
+
+splitted.gentes <- strsplit(steam.games$popu_tags, ",")
+
+splitted.gentes <- lapply(splitted.gentes, function (x){
+  x <- unique(x)
+  # Turn-based
+  x <- x[!x == "Based"]
+  # FPS - TPS etc...
+  x <- x[!x == "Person"]
+  # Rich Presence
+  x <- x[!x == "Rich"]
+  # Great Soundtrack, Great Combat etc...
+  x <- x[!x == "Great"]
+  # Free to Play
+  x <- x[!x == "Play"]
+  # Early Access
+  x <- x[!x == "Access"]
+  # Open World
+  x <- x[!x == "World"]
+  # Real-Time
+  x <- x[!x == "Time"]
+  
+  x[x == "Early"] = "Early Access"
+  x[x == "Turn-"] = "Turn-Based"
+  x[x == "First-"] = "First-Person Shooter"
+  x[x == "Third-" || x == "Third"] = "Third-Person Shooter"
+  x[x == "Hero"] = "Hero Shooter"
+  x[x == "Team-"] = "Team-Based"
+  x[x == "Party-"] = "Party-Based"
+  x[x == "Fast-"] = "Fast-Paced"
+  x[x == "Free"] = "Free To Play"
+  x[x == "Open"] = "Open World"
+  x[x == "Massively"] = "MMO"
+  x[x == "Class-"] = "Class-Based"
+  x[x == "Base"] = "Base Building"
+  x[x == "Looter"] = "Looter Shooter"
+  x[x == "Real-"] = "Real-time"
+
+  x
+})
+
+steam.all.genres <- as.factor(unlist(splitted.gentes))
+steam.games$popu_tags <- as.list(splitted.gentes)
+
 
 steam.games$categories = sub('^.|.$',"", steam.games$categories)
 steam.games$categories <- gsub("'", "", steam.games$categories)
 steam.games$categories <- gsub(" ", "", steam.games$categories)
-steam.games$categories <- as.list(strsplit(steam.games$categories, ","))
+steam.games$categories <- gsub("]$", "", steam.games$categories)
+
+splitted.categories <- strsplit(steam.games$categories, ",")
+
+steam.all.categories <- as.factor(unlist(splitted.categories))
+steam.games$categories <- as.list(splitted.categories)
 
 #https://stackoverflow.com/questions/24256044/comma-separated-string-to-list-in-r
 #Senin attýðýn, listeye çeviriyor
