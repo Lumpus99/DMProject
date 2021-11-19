@@ -51,13 +51,18 @@ splitted.gentes <- lapply(splitted.gentes, function (x){
   x <- x[!x == "World"]
   # Real-Time
   x <- x[!x == "Time"]
+  # Battle Royale
+  x <- x[!x == "Royale"]
+  x <- x[!x == "+"]
   
   x[x == "Early"] = "Early Access"
   x[x == "Turn-"] = "Turn-Based"
   x[x == "First-"] = "First-Person Shooter"
-  x[x == "Third-" || x == "Third"] = "Third-Person Shooter"
+  x[x == "Third-"] = "Third-Person Shooter"
+  x[x == "Third"] = "Third-Person Shooter"
   x[x == "Hero"] = "Hero Shooter"
   x[x == "Team-"] = "Team-Based"
+  x[x == "Royale"] = "Battle Royale"
   x[x == "Party-"] = "Party-Based"
   x[x == "Fast-"] = "Fast-Paced"
   x[x == "Free"] = "Free To Play"
@@ -67,7 +72,11 @@ splitted.gentes <- lapply(splitted.gentes, function (x){
   x[x == "Base"] = "Base Building"
   x[x == "Looter"] = "Looter Shooter"
   x[x == "Real-"] = "Real-time"
-
+  x[x == "Strategye"] = "Strategy"
+  x[x == "Tower"] = "Tower Defense"
+  x[x == "Attacks"] = "Score Attack"
+  x <- gsub('[[:digit:]]+', '', x)
+  x <- unique(x)
   x
 })
 

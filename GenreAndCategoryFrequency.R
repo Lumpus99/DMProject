@@ -1,9 +1,4 @@
 library(tidyverse)
-library(ggplot2)
-# https://stackoverflow.com/questions/48350991/filter-a-dataframe-by-values-in-a-column-of-type-list
-# survival.games <- filter(steam.games, map_lgl(steam.games$popu_tags, ~'Survival' %in% .))
-# steam.merged.games.charts <- merge(x = survival.games, y = steam.charts, by = "name")
-# table(unlist(steam.genre.data))
 
 generate.most.frequent <- function(list.param, x, y){
   df <- (list.param 
