@@ -101,3 +101,4 @@ steam.games$categories <- as.list(splitted.categories)
 #list'i data'ya çeviriyor ama iþimize yarar mý zorlaþtýrýr mý bilemedim - kolon isimlerine edit gerek
 # steam.genre.data <- do.call(rbind.data.frame, steam.genre.list)
 
+#life hard
