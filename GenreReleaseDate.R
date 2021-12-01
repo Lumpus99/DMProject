@@ -2,18 +2,18 @@
 steam.games$year <- str_sub(steam.games$`date`,-4,-1)
 steam.games$year <- as.numeric(as.character(steam.games$year))
 
-library("collections")
 library("data.table")
 
 differentgenres <- unique(unlist(splitted.gentes))
 matrix(differentgenres)
-a <- length(differentgenres)
+genrecount <- length(differentgenres)
 
-genre.year.summary <- data.frame(matrix(ncol = 23, nrow = a))
+genre.year.summary <- data.frame(matrix(ncol = 24, nrow = genrecount))
 year <- c(sprintf("Year %02d", seq(2000,2021)))
-years <- c("genre", year)
+years <- c("genre", year, "Total")
 colnames(genre.year.summary) <- years
 genre.year.summary$genre <- differentgenres
+
 
 steam.games.genre.year <- select(steam.games, c("popu_tags","year"))
 for (i in 2000:2021) {
@@ -25,4 +25,12 @@ for (i in 2000:2021) {
   }
   print(i)
 }
-genre.year.summary.2 = transpose(genre.year.summary)
+
+fun <- function(genre.year.summary) {
+       require(dplyr)
+       y <- select_if(genre.year.summary, is_numeric)
+       rowSums(y, na.rm=T)
+  }
+
+genre.year.summary$Total<-fun(genre.year.summary)
+genre.year.shortened <- genre.year.summary[!(genre.year.summary$Total < 200),]
