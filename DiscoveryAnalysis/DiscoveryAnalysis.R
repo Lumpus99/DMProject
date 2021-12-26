@@ -10,7 +10,7 @@ dt <- rpart(stickiness_avg_factor ~
             +Horror+Strategy+Sports
             +Sandbox, training.data.factor, cp=0.0035)
 
-#rpart.plot(dt, extra=101, main="stickiness_avg")
+rpart.plot(dt, extra=101, main="stickiness_avg")
 
 dt <- rpart(stickiness_sd_factor ~ 
               Indie+Building+Tactical
@@ -20,7 +20,7 @@ dt <- rpart(stickiness_sd_factor ~
             +Horror+Strategy+Sports
             +Sandbox, training.data.factor, cp=0.003621)
 
-#rpart.plot(dt, extra=101, main="stickiness_sd")
+rpart.plot(dt, extra=101, main="stickiness_sd")
 
 dt <- rpart(trendiness_factor ~ 
               Indie+Building+Tactical
@@ -31,7 +31,7 @@ dt <- rpart(trendiness_factor ~
             +Sandbox, training.data.factor, cp=0.005)
 
 
-#rpart.plot(dt, extra=101, main="trendiness")
+rpart.plot(dt, extra=101, main="trendiness")
 
 dt <- rpart(obsoleteness_factor ~ 
               Indie+Building+Tactical
@@ -55,7 +55,7 @@ s <- ksvm(stickiness_avg_factor ~
 
 predictions <- predict(s, svm.testing.data) 
 print(table(predictions, svm.testing.data$stickiness_avg_factor, dnn=c("Prediction", "Actual")))
-print(confusionMatrix(svm.testing.data$stickiness_avg_factor, predictions))
+print(confusionMatrix(reference = svm.testing.data$stickiness_avg_factor, data = predictions))
 
 
 s <- ksvm(stickiness_sd_factor ~ 
@@ -64,7 +64,7 @@ s <- ksvm(stickiness_sd_factor ~
           +Singleplayer+Multiplayer, data=svm.training.data)
 
 predictions <- predict(s, svm.testing.data) 
-print(confusionMatrix(svm.testing.data$stickiness_sd_factor, predictions))
+print(confusionMatrix(reference = svm.testing.data$stickiness_sd_factor, data = predictions))
 
 s <- ksvm(trendiness_factor ~ 
             Indie+Building+Tactical
@@ -72,7 +72,7 @@ s <- ksvm(trendiness_factor ~
           +Singleplayer+Multiplayer, data=svm.training.data)
 
 predictions <- predict(s, svm.testing.data) 
-print(confusionMatrix(svm.testing.data$trendiness_factor, predictions))
+print(confusionMatrix(reference = svm.testing.data$trendiness_factor, data = predictions))
 
 s <- ksvm(obsoleteness_factor ~ 
             Indie+Building+Tactical
@@ -80,7 +80,7 @@ s <- ksvm(obsoleteness_factor ~
           +Singleplayer+Multiplayer, data=svm.training.data)
 
 predictions <- predict(s, svm.testing.data) 
-print(confusionMatrix(svm.testing.data$obsoleteness_factor, predictions))
+print(confusionMatrix(reference = svm.testing.data$obsoleteness_factor, data = predictions))
 
 #print(plot(predictions))
 
