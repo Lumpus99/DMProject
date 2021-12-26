@@ -57,17 +57,18 @@ steam.charts.scores <- (steam.charts
                             %>% transform(trendiness=(max_gain / max_peak),
                                           obsoleteness=(min_gain / max_peak)))
 # Outlier management
-steam.charts.scores$stickiness_avg[steam.charts.scores$stickiness_avg < 0.1] <- 0.1
-steam.charts.scores$stickiness_avg[steam.charts.scores$stickiness_avg >= 0.4] <- 0.4
+#steam.charts.scores$stickiness_avg[steam.charts.scores$stickiness_avg < 0.1] <- 0.1
+#steam.charts.scores$stickiness_avg[steam.charts.scores$stickiness_avg >= 0.5] <- 0.5
 
-steam.charts.scores$stickiness_sd[steam.charts.scores$stickiness_sd < 0.05] <- 0.05
-steam.charts.scores$stickiness_sd[steam.charts.scores$stickiness_sd >= 0.17] <- 0.17
+#steam.charts.scores$stickiness_sd[steam.charts.scores$stickiness_sd < 0.05] <- 0.05
+#steam.charts.scores$stickiness_sd[steam.charts.scores$stickiness_sd >= 0.17] <- 0.17
 
-steam.charts.scores$trendiness[steam.charts.scores$trendiness < 0] <- 0
-steam.charts.scores$trendiness[steam.charts.scores$trendiness >= 0.3] <- 0.3
+#steam.charts.scores$trendiness[steam.charts.scores$trendiness < 0] <- 0
+#steam.charts.scores$trendiness[steam.charts.scores$trendiness >= 0.4] <- 0.4
 
-steam.charts.scores$obsoleteness[steam.charts.scores$obsoleteness < -0.25] <- -0.25
-steam.charts.scores$obsoleteness[steam.charts.scores$obsoleteness >= -0.05] <- -0.05
+#steam.charts.scores$obsoleteness[steam.charts.scores$obsoleteness < -0.30] <- -0.30
+#steam.charts.scores$obsoleteness[steam.charts.scores$obsoleteness >= -0] <- -0
+
 
 steam.charts.scores.condensed <- steam.charts.scores %>% group_by(name) %>% summarise(
   name=first(name), 
@@ -76,38 +77,54 @@ steam.charts.scores.condensed <- steam.charts.scores %>% group_by(name) %>% summ
   trendiness=first(trendiness), 
   obsoleteness=first(obsoleteness))
 
+steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
+  mutate(stickiness_avg_factor = if_else(stickiness_avg > 0.23, 1, 0))
+
+steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
+  mutate(stickiness_sd_factor = if_else(stickiness_sd > 0.14, 1,0))
+
+steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
+  mutate(trendiness_factor = if_else(trendiness > 0.25, 1, 0))
+
+steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
+  mutate(obsoleteness_factor = if_else(obsoleteness > -0.07, 1, 0))
+  
+steam.charts.scores.condensed <- steam.charts.scores.condensed %>% 
+  mutate_at(vars(stickiness_avg_factor, stickiness_sd_factor,trendiness_factor,obsoleteness_factor), factor)
 
 his.stickiness.avg <- (ggplot(steam.charts.scores.condensed, aes(x=stickiness_avg)) 
-  + geom_histogram(bins = 7,fill = "white", color="Purple" )
-  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 7))  
+  + geom_histogram(bins = 15,fill = "white", color="Purple" )
+  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 15))  
 
 his.stickiness.sd <- (ggplot(steam.charts.scores.condensed, aes(x=stickiness_sd)) 
-  + geom_histogram(bins = 7,fill = "white", color="Pink" )
-  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 7))  
+  + geom_histogram(bins = 15,fill = "white", color="Pink" )
+  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 15))  
 
 his.trendiness <- (ggplot(steam.charts.scores.condensed, aes(x=trendiness)) 
-  + geom_histogram(bins = 7,fill = "white", color="Green" )
-  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 7)) 
+  + geom_histogram(bins = 15,fill = "white", color="Green" )
+  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 15)) 
 
 his.obsoleteness <- (ggplot(steam.charts.scores.condensed, aes(x=obsoleteness)) 
-  + geom_histogram(bins = 7,fill = "white", color="Red" )
-  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 7))  
+  + geom_histogram(bins = 15,fill = "white", color="Red" )
+  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 15))  
 
 his.stickiness.avg <- ggplot_build(his.stickiness.avg)
 his.stickiness.sd <- ggplot_build(his.stickiness.sd)
 his.trendiness <- ggplot_build(his.trendiness)
 his.obsoleteness <- ggplot_build(his.obsoleteness)
 
-#print(his.stickiness.avg)
-#print(his.stickiness.sd)
-#print(his.trendiness)
+print(his.stickiness.avg)
+print(his.stickiness.sd)
+print(his.trendiness)
 print(his.obsoleteness)
 
+
+
 training.data <- (steam.charts.scores.condensed[c("name", 
-                                         "stickiness_avg", 
-                                         "stickiness_sd", 
-                                         "trendiness", 
-                                         "obsoleteness")]
+                                         "stickiness_avg_factor", 
+                                         "stickiness_sd_factor", 
+                                         "trendiness_factor", 
+                                         "obsoleteness_factor")]
                     %>% merge(compile.genre.func(steam.games, c("Indie","Building","Tactical","Puzzle",
                                                                 "Adventure", "Action", "Singleplayer", "Multiplayer", "Shooter",  "Survival", 
                                                                 "Roguelike","Simulation",
@@ -137,7 +154,8 @@ training.data.factor <- (training.data.factor[c("name",
 
 print(str(training.data.factor))
 print(table(training.data.factor$stickiness_sd_factor))
-
+if (FALSE) {
+}
 # print(filter(test.data, rowSums(test.data[,-1]) == 1))
 # table(training.data.factor[,-1:-5]$Puzzle)
 # print(rowSums(training.data.factor[,-1:-5]))
