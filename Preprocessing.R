@@ -25,15 +25,15 @@ steam.charts$name <- tolower(gsub("[^[:alnum:] ]", "", steam.charts$name))
 
 #https://stackoverflow.com/questions/35113553/r-remove-first-character-from-string/35113673
 #özel karakterleri çýkardým, boþluklarý çýkardým çünkü ilk genre sürekli boþluksuz gözüküyordu direk datanýn içinde, ve baþa boþluk eklemek daha zor
-steam.games$popu_tags = sub('^.|.$',"", steam.games$popu_tags)
+steam.games$popu_tags <- sub('^.|.$',"", steam.games$popu_tags)
 steam.games$popu_tags <- gsub("'", "", steam.games$popu_tags)
 steam.games$popu_tags <- gsub(" ", "", steam.games$popu_tags)
 steam.games$popu_tags <- gsub("]$", "", steam.games$popu_tags)
 steam.games$popu_tags <- gsub("\\+$", "", steam.games$popu_tags)
 
-splitted.gentes <- strsplit(steam.games$popu_tags, ",")
+splitted.genres <- strsplit(steam.games$popu_tags, ",")
 
-splitted.gentes <- lapply(splitted.gentes, function (x){
+splitted.genres <- lapply(splitted.genres, function (x){
   x <- unique(x)
   # Turn-based
   x <- x[!x == "Based"]
@@ -77,11 +77,12 @@ splitted.gentes <- lapply(splitted.gentes, function (x){
   x[x == "Attacks"] = "Score Attack"
   x <- gsub('[[:digit:]]+', '', x)
   x <- unique(x)
+  x <- head(x, 10)
   x
 })
 
-steam.all.genres <- as.factor(unlist(splitted.gentes))
-steam.games$popu_tags <- as.list(splitted.gentes)
+steam.all.genres <- as.factor(unlist(splitted.genres))
+steam.games$popu_tags <- as.list(splitted.genres)
 
 
 steam.games$categories = sub('^.|.$',"", steam.games$categories)

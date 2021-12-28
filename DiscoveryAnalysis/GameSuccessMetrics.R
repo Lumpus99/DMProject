@@ -15,15 +15,16 @@ categorize.data.func <- function(data, histogram, column, new_label){
 }
 
 compile.genre.func <- function(data, genre.list){
-  genre.list <- gsub(" ", "_", genre.list)
   print(genre.list)
-  (data[c("name", "popu_tags")] 
-   %>% unnest_longer(popu_tags) 
-   %>% filter(popu_tags %in% genre.list) 
-   %>% table 
-   %>% as.data.frame.matrix 
-   %>% mutate(across(, as.logical)) 
-   %>% rownames_to_column("name"))
+  genre.table <- (data[c("name", "popu_tags")] 
+                   %>% unnest_longer(popu_tags) 
+                   %>% filter(popu_tags %in% genre.list) 
+                   %>% table 
+                   %>% as.data.frame.matrix 
+                   %>% mutate(across(, as.logical)) 
+                   %>% rownames_to_column("name"))
+  names(genre.table) <- make.names(names(genre.table), unique=TRUE)
+  genre.table
 }
 
 #stickiness
@@ -81,13 +82,13 @@ steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
   mutate(stickiness_avg_factor = if_else(stickiness_avg > 0.23, 1, 0))
 
 steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
-  mutate(stickiness_sd_factor = if_else(stickiness_sd > 0.14, 1,0))
+  mutate(stickiness_sd_factor = if_else(stickiness_sd > 0.115, 1,0))
 
 steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
-  mutate(trendiness_factor = if_else(trendiness > 0.25, 1, 0))
+  mutate(trendiness_factor = if_else(trendiness > 0.15, 1, 0))
 
 steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
-  mutate(obsoleteness_factor = if_else(obsoleteness > -0.07, 1, 0))
+  mutate(obsoleteness_factor = if_else(obsoleteness > -0.10, 1, 0))
   
 steam.charts.scores.condensed <- steam.charts.scores.condensed %>% 
   mutate_at(vars(stickiness_avg_factor, stickiness_sd_factor,trendiness_factor,obsoleteness_factor), factor)
@@ -127,9 +128,9 @@ training.data <- (steam.charts.scores.condensed[c("name",
                                          "obsoleteness_factor")]
                     %>% merge(compile.genre.func(steam.games, c("Indie","Building","Tactical","Puzzle",
                                                                 "Adventure", "Action", "Singleplayer", "Multiplayer", "Shooter",  "Survival", 
-                                                                "Roguelike","Simulation",
+                                                                "Roguelike","Simulation","Pixel","Turn-Based","Archade","Racing",
                                                                 "Horror", "Strategy",  "Strategy", "Atmospheric", "Fantasy", "Violent",
-                                                                "Sports", "Open World", "Sandbox")), by="name"))
+                                                                "Sports", "Open World", "Sandbox","MMO","Cute","Exploration")), by="name"))
 
 training.data.factor <- categorize.data.func(steam.charts.scores.condensed, his.stickiness.avg, "stickiness_avg" , "stickiness_avg_factor")
 training.data.factor <- categorize.data.func(training.data.factor, his.stickiness.sd, "stickiness_sd" , "stickiness_sd_factor")
@@ -140,7 +141,7 @@ training.data.factor$stickiness_avg_factor <- as.factor(training.data.factor$sti
 training.data.factor$stickiness_sd_factor <- as.factor(training.data.factor$stickiness_sd_factor)
 training.data.factor$trendiness_factor <- as.factor(training.data.factor$trendiness_factor)
 training.data.factor$obsoleteness_factor <- as.factor(training.data.factor$obsoleteness_factor)
-
+if(FALSE){
 training.data.factor <- (training.data.factor[c("name", 
                                                   "stickiness_avg_factor", 
                                                   "stickiness_sd_factor", 
@@ -153,9 +154,9 @@ training.data.factor <- (training.data.factor[c("name",
                                                                "Sports", "Open World", "Sandbox")), by="name"))
 
 print(str(training.data.factor))
-print(table(training.data.factor$stickiness_sd_factor))
+print(table(training.data.factor$stickiness_sd_factor))}
 if (FALSE) {
 }
-# print(filter(test.data, rowSums(test.data[,-1]) == 1))
+# filter(training.data, rowSums(training.data[,-1:-5]) == 0)
 # table(training.data.factor[,-1:-5]$Puzzle)
 # print(rowSums(training.data.factor[,-1:-5]))
