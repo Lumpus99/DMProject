@@ -1,0 +1,630 @@
+---
+title: "BBM713 - Data Mining"
+subtitle: "2021 Fall Final Project Report"
+author: "Mert Onur Çakıroglu and Baran Güryuva"
+date: "due 05/01/2022"
+output:
+  pdf_document: default
+urlcolor: blue
+---
+
+# Summary
+
+Here we outline our project and explain our motivation in doing this project in one paragraph.
+
+In every part of the below document, you should both include textual explanations (like this) and R code of your study:
+
+```{r}
+print("like this...")
+```
+
+Your code should be runnable. You should finally knit this document as a pdf file and submit the pdf file (only) at [this form](https://forms.gle/idXra1iXMeg8poUr6).
+
+
+# Introduction
+
+While starting our research, we tried checking as many Steam and games related data sets over the internet, and any articles or exploratory research done on our topic to get an initial understanding of our subject. We have found around 5 datasets with decent unique numbers in them. After deciding on the area we wanted to focus on, we reduced the datasets available into 3. One that provides good information about the general information for a given title, another that provides monthly player counts for different games, and a third that gives information about the original and sale prices of games. After checking the data more, the third dataset was also dropped and we decided to work on the initial two sets.
+
+
+
+## Data Source
+
+In this chapter we will explain the data we used for this project and explore some of the related works. 
+
+### Steam Games Data
+
+This data provides us with the basics of a given name. It provides the name, release date, developer, publisher, description of the game in steam store, requirements to run the game, popular tags, price on US steam store, information, categories, and if there is, restrictions on age. It has 80893 unique values, which is a sufficient database for us to have a proper investigation. The file was in “.json” format, which we decided to work upon more after starting the process. The data is publicly available. The information gathered by the data also seems to be publicly available, both on Steam website 
+
+* Data Release Date: 27.12.2020 
+* Data Author: Deepan.N 
+* Data Link: [Steam Games Data](https://www.kaggle.com/deepann/80000-steam-games-dataset?select=steam_data.csv) 
+
+### Popularity of games on Steam
+
+This data provides the average player count, peak player count, difference in count compared to previous month, and percentage of the average player count to peak player count. These parameters are given for a given game and for a given month, for all available dates. This information is done for 1260 unique games, which is a considerably smaller set, but as it provides us with a whole lot of information that is needed for the bulk of our research. The data is publicly available. Information provided by the data is also publicly available on steam owned websites.
+
+* Data Release Date: 03.03.2021
+* Data Author: Michal Bogacz
+* Data Link: [Popularity of games on Steam](https://www.kaggle.com/michau96/popularity-of-games-on-steam)
+
+
+
+## Related Work
+
+There are a number of studies out there to understand how a given game will perform in the future for a given number of criteria beforehand. While the aspect these researchers use in order to achieve the algorithm differs from our views, they can provide a good source to understand the logic behind other systems. Two of them had some insight we could use. We tried to avoid direct implementation of their methods to both match the resources available to us and create a unique way to evaluate the results, instead of copying a small scale implementation of a bigger analysis. 
+
+[Estimating Video Game Success using Machine Learning (Aashish Prasad, August 2019)](https://www.researchgate.net/publication/337290854_Estimating_Video_Game_Success_using_Machine_Learning)
+
+This general thesis study which helps readers understand how to approach video game success evaluation helps us create a starting point for our idea. It talks about how to use and prepare the data, different ways the data can be modelled, and how to evaluate the given results. Separation of results into intervals symbolising different scores was the basis of our initial histogram evaluating system. 
+
+[Machine Learning for Predicting Success of Video Games (Michal Trněný, 2017)](https://is.muni.cz/th/k2c5b/diploma_thesis_trneny.pdf)
+
+In some aspects, the data we used are similar to the process found here. The same open sources for both player counts and popularity were used. Instead of our available data, the author created his own, but the sources are at its core, the same. This article gave us some information on which data to use where, and how we can bring out the most out of the limited dataset. Also, a very different evaluation system was implemented here, which we were intrigued by but also differed in vision on how to judge games. Still, understanding the many different views a game's success can be accepted by different experts showed us the availability of upgrades in this field. Our project shouldn't be just about processing a given data in the best way possible, it should also be about trying to find the best way to evaluate this data.
+
+
+# Preprocessing
+
+Explain the steps of preprocessing you applied.
+
+## Cleaning
+
+Initial problem was merging these two data into a singular file to work upon. As said, we were aiming to work about genre and traits regarding player numbers, which we need to gather in a single document. Common column used for merging was decided to be the name of the games, and the two data had small differences in the format. While it is impossible to examine all differences in these columns, a general solution was implemented to both columns. These changes are, in order;
+
+* Rename the name columns so that 2 dataframes can be merged
+* Deletion of all special characters, in example such as (™) which cannot be considered basic alphanumeric.
+* Making all the names lowercase, to prevent matching problems in R.
+* Deleting all punctuation symbols, such as dots, apostrophes, dollar signs.
+
+
+```{r}
+set.seed(1234)
+
+#Import files
+steam.charts <- read.csv(file=file.path(".", "Data", "SteamCharts.csv"))
+steam.games <- read.csv(file.path(".", "Data", "final_data_new.csv"))
+
+cat("Steam Games dataset size: ", print(nrow(steam.games)))
+cat("Steam Games Popularity dataset size: ", print(nrow(steam.charts)))
+
+#Rename name columns
+names(steam.charts)[names(steam.charts) == "gamename"] <- "name"
+
+#Clean name column
+steam.games$name <- tolower(gsub("[^[:alnum:] ]", "", steam.games$name))
+steam.charts$name <- tolower(gsub("[^[:alnum:] ]", "", steam.charts$name))
+
+#Clean Popular tags
+steam.games$popu_tags <- sub('^.|.$',"", steam.games$popu_tags)
+steam.games$popu_tags <- gsub("'", "", steam.games$popu_tags)
+steam.games$popu_tags <- gsub(" ", "", steam.games$popu_tags)
+steam.games$popu_tags <- gsub("]$", "", steam.games$popu_tags)
+steam.games$popu_tags <- gsub("\\+$", "", steam.games$popu_tags)
+
+head(steam.games, 3)["name"]
+head(unlist(steam.games$popu_tags),3)
+
+```
+
+
+Since this file is converted form json to csv, the popular tags column is in a string type column. To solve this we have to convert this string column to a list column. As it can be seen from the example data from above, some tags are unmeaningful and need to be parsed or removed. To divide this into a proper list, strsplit() method was applied to the column to create a new list for splitted genres, for each row. 
+
+```{r}
+splitted.genres <- strsplit(steam.games$popu_tags, ",")
+splitted.genres[2]
+```
+
+
+This new list had some problems with the naming process, due to errors from the original data set itself. For example, as it can be seen from the above example, ’First’, ‘Person’, ‘Shooter’ are separated as different tags instead of a single “First-Person Shooter” tag. We had to manually parse and clean these kinds of errors. To clean these kinds of errors, we renamed ‘First’ tag to the correct format (First-Person Shooter) and removed ‘Person’. Since every First-Person Shooter can also be considered a “Shooter” game we keep that tag. However, if the game already has the ‘Shooter’ tag, we have to deal with duplicates. Another problem is, this process won’t be feasible to fix every tag error present in our dataset since there are many of them. Luckily, we can focus on fixing the most popular tags in this column. If we plot a graph based on the most popular columns we get, 
+
+```{r message=FALSE}
+library(tidyverse)
+
+splitted.genres <- strsplit(steam.games$popu_tags, ",")
+steam.all.genres <- as.factor(unlist(splitted.genres))
+
+#Find most frequent genres
+generate.most.frequent <- function(list.param, x, y){
+  df <- (list.param 
+         %>% summary() 
+         %>% sort(decreasing=TRUE) 
+         %>% as.data.frame())
+  
+  df <- (df 
+         %>% rownames() 
+         %>% cbind(df))
+  
+  rownames(df) <- NULL
+  colnames(df) <- c(x,y)
+  df
+}
+genre.summary.data <- generate.most.frequent(steam.all.genres,"Tag","Count")
+
+#Plot Most Frequent Genres
+(ggplot(data=genre.summary.data[2:11,], aes(x=Tag , y=Count)) 
++ geom_bar(stat="identity") 
++ scale_x_discrete(limits=genre.summary.data[2:11,]$Tag)) %>% print()
+```
+
+
+Since we are not planning to work on the entire game tags list, focusing only on the most popular tags is enough for our case. After this, we have to remove duplicate tags which is present in our data. Lastly, we take the first 10 tags and remove the rest. This is because we observed that tags after the 10th position start to become meaningless or irrelevant to the game. Finally, we end up with a relatively clean tag dataset.
+
+```{r message=FALSE}
+
+# Clean popular tags
+
+splitted.genres <- lapply(splitted.genres, function (x){
+  x <- unique(x)
+  # Turn-based
+  x <- x[!x == "Based"]
+  # FPS - TPS etc...
+  x <- x[!x == "Person"]
+  # Rich Presence
+  x <- x[!x == "Rich"]
+  # Great Soundtrack, Great Combat etc...
+  x <- x[!x == "Great"]
+  # Free to Play
+  x <- x[!x == "Play"]
+  # Early Access
+  x <- x[!x == "Access"]
+  # Open World
+  x <- x[!x == "World"]
+  # Real-Time
+  x <- x[!x == "Time"]
+  # Battle Royale
+  x <- x[!x == "Royale"]
+  
+  # Misc. Removals
+  x <- x[!x == "+"]
+  x <- x[!x == "Basade"]
+
+  # Modify tags in correct format
+  x[x == "Early"] = "Early Access"
+  x[x == "Turn-"] = "Turn-Based"
+  x[x == "First-"] = "First-Person Shooter"
+  x[x == "Third-"] = "Third-Person Shooter"
+  x[x == "Third"] = "Third-Person Shooter"
+  x[x == "Hero"] = "Hero Shooter"
+  x[x == "Team-"] = "Team-Based"
+  x[x == "Royale"] = "Battle Royale"
+  x[x == "Party-"] = "Party-Based"
+  x[x == "Fast-"] = "Fast-Paced"
+  x[x == "Free"] = "Free To Play"
+  x[x == "Open"] = "Open World"
+  x[x == "Massively"] = "MMO"
+  x[x == "Class-"] = "Class-Based"
+  x[x == "Base"] = "Base Building"
+  x[x == "Looter"] = "Looter Shooter"
+  x[x == "Real-"] = "Real-time"
+  x[x == "Strategye"] = "Strategy"
+  x[x == "Tower"] = "Tower Defense"
+  x[x == "Attacks"] = "Score Attack"
+  
+  # Remove numbers
+  x <- gsub('[[:digit:]]+', '', x)
+  
+  # Take unique tags
+  x <- unique(x)
+  
+  # Take the first 10 tag
+  x <- head(x, 10)
+  
+  # Return new tag list
+  x
+})
+
+steam.all.genres <- as.factor(unlist(splitted.genres))
+steam.games$popu_tags <- as.list(splitted.genres)
+
+genre.summary.data <- generate.most.frequent(steam.all.genres,"Tag","Count")
+
+#Plot Most Frequent Genres
+(ggplot(data=genre.summary.data[2:11,], aes(x=Tag , y=Count)) 
++ geom_bar(stat="identity") 
++ scale_x_discrete(limits=genre.summary.data[2:11,]$Tag)) %>% print()
+```
+
+
+
+## Imputation
+This part was not neccessary for our dataset.
+
+## Anomaly detection
+No anamoly was deceted was in our dataset.
+
+## Feature extraction
+
+To fairly judge games in our dataset, we decided to make scoring metrics to fairly judge how successful a game is. We decided on 5 different metrics to measure how successful a particular game is. With these metrics, our aim is to measure different factors of a game’s success. Collectively these 5 scores should give an idea of different trends in the player count data. In this chapter, our aim is to give every game in our dataset 5 different success scores based on the different aspects of the player count data. The following are the explanations of every success metric we calculated for every game in our dataset and the justification behind it. 
+
+### Stickiness Scores
+In the user statistics, stickiness values are calculated as daily active users (DAU) divided by monthly (MAU) active users. This value aims to give us a measure of the growth of the userbase by calculating how many of the users are using or in other words “sticking” with the application in the long term. A high stickiness score means that users highly value the product. However due to the limitations of the publicly available data for steam games we had to modify the Stickiness metric to apply it to our data. Our aim with these modifications was to get an estimation of the real stickiness score. The first change we made was using average and peak player counts instead of active user counts. Normally, active users are calculated with the total number of unique users that have used a specific application in a certain time frame. However, this data is not publicly available for many games. The second change we made was the stickiness score time interval. Normally stickiness score is calculated for every day (DAU/MAU). Unfortunately, we do not have access to daily player count data.  Our player count data only allow us to make monthly analyses. Because of that we instead calculated a single stickiness value for every month. With these changes, we are left with the following expression to estimate the real stickiness value: Stickiness_estimation = (Monthly average user / Peak Yearly User)
+
+We divide average users by peak users because peak users give us a closer value to a unique visitor count that year. While using monthly average user penalizes games with only short-term success while rewarding games with long-term success. Games that can maintain a high player count for the entire month will score much higher with this metric. Our aim with this is to increase the classification accuracy of our model explained in the 4th chapter. 
+
+
+```{r message=FALSE}
+#Calculate Stickiness Score
+steam.charts.scores <- (steam.charts 
+                            %>% group_by(name, year) 
+                            %>% summarise(peak_yau=max(peak))
+                            %>% ungroup()
+                            %>% merge(steam.charts, by=c('name','year'))
+                            %>% transform(stickiness=(avg / peak_yau)))
+
+head(steam.charts.scores[c("name", "stickiness")], 5)
+```
+
+With the stickiness calculations, we have a monthly scoring system for every game. Although this time-dependent data could be used for different types of analyses for future work, we need a single “Overall” score value for every game independent of time to judge if a game is successful or not. To condense these values to a single value we did 2 approaches. The first approach is taking the average stickiness score (AS) and the second is a standard derivation of stickiness score (SDS). These scores are supposed to give the overall value and distribution for consistency. For example, a high AS and SDS score means the game only managed to attract users for short periods of time. This kind of trend in AS and SDS indicates a large but unloyal community. On the other hand, a low AS and SDS mean the game attracts a small number of users however the new users tend to stick for a longer amount of time. This kind of trend in AS and SDS indicates a small, niche but dedicated community. When we sort by the AS score we see that it is dominated by idle games. Since idle games are aimed to be played for long periods of time. On the other hand we sort by SDS scores we see games that were popular for a short amount of time but got forgotten quickly like Fall Guys Ultimate Knockout, Doki Doki Literature Club, and many more. These game examples indicate that we are correctly scoring our games. 
+
+```{r message=FALSE}
+
+# Calculate AS and SDS scores
+steam.charts.scores <- (steam.charts.scores 
+                        %>% group_by(name)
+                        %>% summarise(stickiness_avg=mean(stickiness, na.rm = TRUE),
+                                      stickiness_sd=sd(stickiness, na.rm = TRUE))
+                        %>% ungroup()
+                        %>% merge(steam.charts.scores, by='name'))
+
+steam.charts.scores.stickiness <- (steam.charts.scores 
+                                  %>% group_by(name) 
+                                  %>% summarise(name=first(name), 
+                                                stickiness_avg=first(stickiness_avg),
+                                                stickiness_sd=first(stickiness_sd)))
+
+# Games with high AS
+(steam.charts.scores.stickiness[order(steam.charts.scores.stickiness$stickiness_avg),] 
+  %>% head(10))
+
+# Games with low AS
+(steam.charts.scores.stickiness[order(-steam.charts.scores.stickiness$stickiness_avg),]
+  %>% head(10))
+
+```
+
+
+### Trendiness and Obseletness Scores
+Trendiness and obsoleteness scores measure how fast the game gained or lost new players on their peak and it is calculated by max or min player gain divided by all-time peak player count respectively of the game. These scores are essentially measure designed to measure opposite events. Different from Stickiness scores, these scores are the rate of player gain instead of player’s loyalty to the game. A high trendiness score means the game has gained most of its players in a very short amount of time.
+
+```{r message=FALSE}
+# Calculate Trendiness & Obsoleteness
+steam.charts.scores <- (steam.charts 
+                            %>% group_by(name)
+                            %>% summarise(min_gain=min(gain, na.rm = TRUE),
+                                          max_gain=max(gain, na.rm = TRUE), 
+                                          max_peak=max(peak))
+                            %>% ungroup()
+                            %>% merge(steam.charts.scores, by='name')
+                            %>% transform(trendiness=(max_gain / max_peak),
+                                          obsoleteness=(min_gain / max_peak)))
+
+
+steam.charts.scores.to <- (steam.charts.scores 
+                                  %>% group_by(name) 
+                                  %>% summarise(name=first(name), 
+                                                trendiness=first(trendiness),
+                                                obsoleteness=first(obsoleteness)))
+# Some sample scores
+head(steam.charts.scores.to, 5)
+```
+
+For trendiness score, for most games, the max gain is on the release month. So it is also a measure of the hype surrounding a game’s release. While the gain is the minimum after the initial release month. So obsoleteness is mostly affected by the player loss after the initial player wave after the game release. These 2 scores may be the hardest to classify. With these 2 metrics, our aim is to measure the effect on the speed the game spreads based on the genre and game category factors we determined in the previous chapter. However, high trendiness or obsoleteness scores can be caused by many other factors independent from our data. For example, it can be affected by an update in-game or a good sale. We still hope to find good prediction rules out of this metric but in future work better versions of these metrics can be designed. 
+
+
+### Overall Popularity Score
+
+The overall popularity (OP) score is our most straightforward metric and it’s calculated by getting the all-time peak player count of a game. We just measure this metric by taking the all-time peak of every game in our dataset. All of the other metrics in our dataset measure success relative to itself. With the OP score, we intend to classify games that can manage to enter the mainstream. 
+
+
+```{r message=FALSE}
+# Calculate Trendiness & Obsoleteness
+steam.charts.scores <- (steam.charts 
+                        %>% group_by(name)
+                        %>% summarise(overall.peak = max(peak))
+                        %>% ungroup()
+                        %>% merge(steam.charts.scores, by='name'))
+
+steam.charts.scores.op <- (steam.charts.scores 
+                                  %>% group_by(name) 
+                                  %>% summarise(name=first(name), 
+                                                overall.peak=first(overall.peak)))
+
+# Some sample scores
+head(steam.charts.scores.op, 5)
+```
+
+All of our success metrics summarized: 
+
+* **Average Stickiness (AS):** The loyalty of the players
+* **Standard Deviation of Stickiness (SDS):** Player loyalty fluctuations 
+* **Trendiness:** How fast a game gains players
+* **Obseleteness:** How fast a game lose players
+* **Overall Popularity (OP):** Peak player count
+
+Finally, if we collect all of these scores in a single dataframe we get:
+
+```{r message=FALSE}
+
+# Normalize big peak values
+steam.charts.scores$overall.peak[steam.charts.scores$overall.peak >= 100000] <- 100000
+
+# Create scored dataframe
+steam.charts.scores.condensed <- (steam.charts.scores 
+                                  %>% group_by(name) 
+                                  %>% summarise(name=first(name), 
+                                      stickiness_avg=first(stickiness_avg),
+                                      stickiness_sd=first(stickiness_sd),
+                                      trendiness=first(trendiness), 
+                                      obsoleteness=first(obsoleteness),
+                                      overall.popularity=first(overall.peak)))
+
+
+head(steam.charts.scores.condensed, 5)
+```
+
+### Factorization of our metrics
+
+Normally it would be more informative to use the raw scoring parameters however since our data is limited we decided to factorize our metric scores and work on a binary scoring system. There are 2 main reason why we decided to do this. 
+
+Firstly, accuracy of most machine learning algorithms decrease rapidly while working on arrays or multi-label classification applications. At the earlier stages of our algorithm, we tried to factorize our scoring metrics with 7 levels. This resulted in nearly %20 pinpoint accuracy. This is really low considering random guessing for a 7 point system is already %14 accurate. 
+
+Secondly, it makes it easier to classify for SVM. Giving using raw scores to train our model is hard to understand. It is relatively arbitrary to anyone who doesn’t know the exact formulations, which makes the data only understandable by a limited number of people. We want to reach a point where a game developer, publisher or anyone curious on this topic can quickly understand our evaluation system.
+
+
+To convert raw score data to binary data we plotted a basic histogram for every score to see where we should best split our binary scores.
+
+```{r message=FALSE}
+(ggplot(steam.charts.scores.condensed, aes(x=stickiness_avg)) 
+  + geom_histogram(bins = 15,fill = "white", color="Purple" )
+  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 15))  
+
+(ggplot(steam.charts.scores.condensed, aes(x=stickiness_sd)) 
+  + geom_histogram(bins = 15,fill = "white", color="Pink" )
+  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 15))  
+
+(ggplot(steam.charts.scores.condensed, aes(x=trendiness)) 
+  + geom_histogram(bins = 15,fill = "white", color="Green" )
+  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 15)) 
+
+(ggplot(steam.charts.scores.condensed, aes(x=obsoleteness)) 
+  + geom_histogram(bins = 15,fill = "white", color="Red" )
+  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 15))  
+
+(ggplot(steam.charts.scores.condensed, aes(x=overall.popularity)) 
+  + geom_histogram(bins = 15,fill = "white", color="Blue" )
+  + stat_bin(aes(y=..count.., label=..count..), geom="text",bins = 15))  
+
+```
+
+We plot these histograms using 15 buckets to see the distribution of the scores. We decided to split our scores from the most popular bucket. Although for some of the scores like OP where we don’t see an exact bell curve, some manual splitting has to be applied. For OP score we deemed a game is “successful” if it has more than 10,000 all-time peak players. 
+
+```{r message=FALSE}
+steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
+  mutate(stickiness_avg_factor = if_else(stickiness_avg > 0.23, 1, 0))
+
+steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
+  mutate(stickiness_sd_factor = if_else(stickiness_sd > 0.115, 1,0))
+
+steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
+  mutate(trendiness_factor = if_else(trendiness > 0.15, 1, 0))
+
+steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
+  mutate(obsoleteness_factor = if_else(obsoleteness > -0.10, 1, 0))
+  
+steam.charts.scores.condensed <- steam.charts.scores.condensed %>%
+  mutate(overall_popularity_factor = if_else(overall.popularity > 10000, 1, 0))
+
+# Convert to Factor type
+steam.charts.scores.condensed <- steam.charts.scores.condensed %>% 
+  mutate_at(vars(stickiness_avg_factor, stickiness_sd_factor,trendiness_factor,obsoleteness_factor, overall_popularity_factor), factor)
+
+head(steam.charts.scores.condensed[c("name", "stickiness_avg_factor", "stickiness_sd_factor", "trendiness_factor", "obsoleteness_factor", "overall_popularity_factor")], 5)
+
+```
+
+## Dimensionality reduction
+
+As we mentioned on previous chapters, to increase are accuracy we are only planning to work on most popular tags in Steam. Working on every data would clutter the results beyond the capacities of our model training. For this reason we had to reduce the usable tags to a certain limit. From the most common tags we determined from data cleaning chapter we decided to select the most popular 26 tags. The optimization of this part was crucial to obtain a proper result. Using tags with limited availability would decrease the accuracy of the results, as total available games at the end is about 1259. On the other hand, not adding enough data would decrease the benefits and the insight we can gain from the project. After that, by carefully examining the results, insights and trends we gather at the end,the list was decided to use the following tags:
+
+*Indie - Building - Tactical - Puzzle - Adventure - Action - Atmospheric - Fantasy - Violent - Singleplayer - Multiplayer - Shooter - Pixel - Turn Based - Racing - Open World - Survival - Roguelike - Simulation - Horror - Strategy - Sports - MMO - Cute - Exploration - Sandbox*
+
+We also have to split our tag column which is a list column to seperate boolean columns. This will allow us to build models with the dataset easily.
+
+```{r message=FALSE}
+
+# Define a generelized function to seperate list of tags to seperate columns
+compile.genre.func <- function(data, genre.list){
+  genre.table <- (data[c("name", "popu_tags")] 
+                   %>% unnest_longer(popu_tags) 
+                   %>% filter(popu_tags %in% genre.list) 
+                   %>% table 
+                   %>% as.data.frame.matrix 
+                   %>% mutate(across(, as.logical)) 
+                   %>% rownames_to_column("name"))
+  names(genre.table) <- make.names(names(genre.table), unique=TRUE)
+  genre.table
+}
+
+# Seperate 
+factor.scores <- (steam.charts.scores.condensed[c("name", 
+                                         "stickiness_avg_factor", 
+                                         "stickiness_sd_factor", 
+                                         "trendiness_factor", 
+                                         "obsoleteness_factor",
+                                         "overall_popularity_factor")])
+
+genres.splitted <- compile.genre.func(steam.games, 
+                   c("Indie","Building","Tactical",
+                     "Puzzle","Adventure","Action",
+                     "Atmospheric","Fantasy","Violent",
+                    "Singleplayer","Multiplayer",
+                    "Shooter","Pixel","Turn-Based",
+                    "Racing","Open World","Survival",
+                    "Roguelike","Simulation","Horror",
+                    "Strategy","Sports","MMO","Cute",
+                    "Exploration","Sandbox"))
+
+training.data <- merge(factor.scores, genres.splitted, by="name")
+
+str(training.data)
+```
+
+# Methodology
+
+In this chapter our model training will be explained and outcome of of our models will be analyzed
+
+## Model training
+
+Our goal for this chapter is to train models to predict our factorized success metrics. For model training, we ended up using 2 different models. First is decision trees and then SVM. For decision trees, we decided to set the “cp” parameter to adjust the decision tree’s size. If we set this value too large, the tree can overfit. If we set it too small it may underfit. After many trials, we finalized our cp values to a sweet spot in-between these edge cases. For SVM we tried to adjust the “type” parameter to increase accuracy. Since our data is limited we decided to use 5-fold cross-validation instead of a 20-80% split of training and testing data. 
+
+```{r message=FALSE}
+library(rpart.plot)
+library(kernlab)
+library(caret)
+
+dt <- rpart(stickiness_avg_factor ~ 
+              Indie+Building+Tactical
+            +Puzzle+Adventure+Action+Atmospheric+Fantasy+Violent
+            +Singleplayer+Multiplayer+Shooter+Pixel+Turn.Based+Racing+Open.World
+            +Survival+Roguelike+Simulation
+            +Horror+Strategy+Sports+MMO+Cute+Exploration
+            +Sandbox, training.data, cp=0.0085)
+
+rpart.plot(dt, extra=101, main="AS")
+
+dt <- rpart(stickiness_sd_factor ~ 
+              Indie+Building+Tactical
+            +Puzzle+Adventure+Action+Atmospheric+Fantasy+Violent
+            +Singleplayer+Multiplayer+Shooter+Pixel+Turn.Based+Racing+Open.World
+            +Survival+Roguelike+Simulation
+            +Horror+Strategy+Sports+MMO+Cute+Exploration
+            +Sandbox, training.data, cp=0.01)
+
+rpart.plot(dt, extra=101, main="SDS")
+
+dt <- rpart(trendiness_factor ~ 
+              Indie+Building+Tactical
+            +Puzzle+Adventure+Action+Atmospheric+Fantasy+Violent
+            +Singleplayer+Multiplayer+Shooter+Pixel+Turn.Based+Racing+Open.World
+            +Survival+Roguelike+Simulation
+            +Horror+Strategy+Sports+MMO+Cute+Exploration
+            +Sandbox, training.data, cp=0.007)
+
+
+rpart.plot(dt, extra=101, main="Trendiness")
+
+dt <- rpart(obsoleteness_factor ~ 
+              Indie+Building+Tactical
+            +Puzzle+Adventure+Action+Atmospheric+Fantasy+Violent
+            +Singleplayer+Multiplayer+Shooter+Pixel+Turn.Based+Racing+Open.World
+            +Survival+Roguelike+Simulation
+            +Horror+Strategy+Sports+MMO+Cute+Exploration
+            +Sandbox, training.data, cp=0.006)
+
+rpart.plot(dt, extra=101, main="Obsoleteness")
+
+
+dt <- rpart(overall_popularity_factor ~ 
+              Indie+Building+Tactical
+            +Puzzle+Adventure+Action+Atmospheric+Fantasy+Violent
+            +Singleplayer+Multiplayer+Shooter+Pixel+Turn.Based+Racing+Open.World
+            +Survival+Roguelike+Simulation
+            +Horror+Strategy+Sports+MMO+Cute+Exploration
+            +Sandbox, training.data, cp=0.01)
+
+
+rpart.plot(dt, extra=101, main="OP")
+```
+
+
+```{r}
+s <- ksvm(stickiness_avg_factor ~ 
+            Indie+Building+Tactical
+          +Puzzle+Adventure+Action+Atmospheric+Fantasy+Violent
+          +Singleplayer+Multiplayer+Shooter+Pixel+Turn.Based+Racing+Open.World
+          +Survival+Roguelike+Simulation
+          +Horror+Strategy+Sports+MMO+Cute+Exploration
+          +Sandbox, data=training.data, type="C-bsvc", cross=5)
+print(s)
+
+s <- ksvm(stickiness_sd_factor ~ 
+            Indie+Building+Tactical
+          +Puzzle+Adventure+Action+Atmospheric+Fantasy+Violent
+          +Singleplayer+Multiplayer+Shooter+Pixel+Turn.Based+Racing+Open.World
+          +Survival+Roguelike+Simulation
+          +Horror+Strategy+Sports+MMO+Cute+Exploration
+          +Sandbox, data=training.data, type="C-bsvc", cross=5)
+print(s)
+
+s <- ksvm(trendiness_factor ~ 
+            Indie+Building+Tactical
+          +Puzzle+Adventure+Action+Atmospheric+Fantasy+Violent
+          +Singleplayer+Multiplayer+Shooter+Pixel+Turn.Based+Racing+Open.World
+          +Survival+Roguelike+Simulation
+          +Horror+Strategy+Sports+MMO+Cute+Exploration
+          +Sandbox, data=training.data, type = "C-bsvc", cross=5)
+print(s)
+
+s <- ksvm(obsoleteness_factor ~ 
+            Indie+Building+Tactical
+          +Puzzle+Adventure+Action+Atmospheric+Fantasy+Violent
+          +Singleplayer+Multiplayer+Shooter+Pixel+Turn.Based+Racing+Open.World
+          +Survival+Roguelike+Simulation
+          +Horror+Strategy+Sports+MMO+Cute+Exploration
+          +Sandbox, data=training.data,  type = "C-bsvc", cross=5)
+print(s)
+
+s <- ksvm(overall_popularity_factor ~ 
+            Indie+Building+Tactical
+          +Puzzle+Adventure+Action+Atmospheric+Fantasy+Violent
+          +Singleplayer+Multiplayer+Shooter+Pixel+Turn.Based+Racing+Open.World
+          +Survival+Roguelike+Simulation
+          +Horror+Strategy+Sports+MMO+Cute+Exploration
+          +Sandbox, data=training.data,  type = "spoc-svc", cross=5)
+print(s)
+
+```
+
+
+## Evaluation of results
+
+In this chapter we will comment on the results and performance of our models.
+
+### Decision Trees
+
+The decision trees provided us with an easy way to see how genres affect our success metrics at a glance. Some of the results for the decision trees were reassuring that we are correctly classifying our games with our success metrics.
+
+#### AS
+
+The first aspect of AS decision tree is that is quite noticeable is that the majority of the indie games have low stickiness scores. This was was an expected outcome of our analysis. Another big tag that affects the AS value significantly is the “Multiplayer” tag. We can clearly see that games that have a “Multiplayer” tag have a tendency to have a much higher AS value. If the game is an MMO we also get a get AS value. 
+
+#### SDS
+
+As we expected before, the decision tree fails to find a good rule for the SDS score. Although not very strongly correlated, Survival and Strategy games tend to have a high SDS score. One surprising result from this decision tree is the Puzzle games are surprisingly well classified and almost all of them have low SDS scores. 
+
+#### Trendiness
+
+From the trendiness decision trees, we can clearly see that Roguelike games are immediately classified as highly trendy games. Although not strongly correlated, we can see that sandbox-building games also tend to be trendy. Indie games that have exploration tags tend to have higher trendiness value. Finally, if a game doesn’t have the “Roguelike”, “Building”, “MMO”, “Fantasy” and “Exploration” tags, it will most likely do not have a high trendiness score. 
+
+#### Obseleteness
+
+From the Obseleteness decision tree, we can see that indie games tend to have low Obseleteness scores meaning they lose players faster. The same is also true for Racing games. One interesting finding is games with the “Building” tag in them tend to have lower Obseleteness scores. On the other hand, violent games tend to have high Obseleteness scores meaning they lose players much slower. The same is also true for Indie-Puzzle games. 
+
+#### OP
+
+As expected, Indie games tend to have lower OP scores. Multiplayer-Fantasy games tend to have high OP scores meaning they are really popular. We can also see the effect of the “Building” tag on the OP scores. Having this tag improves the chances of having a high OP value significantly.  We can also see the trend of “Multiplayer” and “Survival” tags having a positive effect on OP score. However, Multiplayer games that don’t have the “Adventure” tag tend to have a low OP score.
+
+
+### SVM
+
+Unfortunately, our SVM models failed to get high accuracy. All of our cross-validation errors are around 0.3 - 0.35. SVM performs the best while classifying the AS score. As predicted in the feature engineering chapter, SVM performs the worse in the trendiness score and the accuracy falls to 0.36 for this metric. To sum up, our errors are like the following:
+
+* **AS:**  0.30
+* **SDS:**  0.32
+* **Trendiness:**  0.36
+* **Obseleteness:** 0.31
+* **OP:**  0.33
+
+
+# Discussion
+
+You should now discuss your results and derive a wisdom out of this study. 
